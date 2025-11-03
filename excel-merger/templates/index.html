@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Merge Excel Files</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='styles.css') }}"
+    />
+  </head>
+  <body>
+    <h1>Merge Excel Files</h1>
+
+    <form method="POST" enctype="multipart/form-data" id="mergeForm">
+      <label class="file-upload">
+        <span>Select Excel Files</span>
+        <input type="file" name="files" id="fileInput" multiple required />
+      </label>
+
+      <p
+        id="reorderHint"
+        style="visibility: hidden; font-size: 0.9rem; color: #aaa"
+      >
+        You can drag the files in the list to reorder them
+      </p>
+
+      <ul id="fileList"></ul>
+
+      <label>
+        <input type="checkbox" name="include_review" checked />
+        Include "Review" column
+      </label>
+
+      <button type="submit">Merge and Download</button>
+      <p id="statusMsg" style="margin-top: 1rem"></p>
+    </form>
+
+    <script>
+      const fileInput = document.getElementById("fileInput");
+      const fileList = document.getElementById("fileList");
+      const form = document.getElementById("mergeForm");
+      const statusMsg = document.getElementById("statusMsg");
+      const submitBtn = form.querySelector("button");
+
+      let filesArray = [];
+
+      fileInput.addEventListener("change", () => {
+        filesArray = Array.from(fileInput.files);
+        updateFileList();
+      });
+
+      function updateFileList() {
+        fileList.innerHTML = "";
+
+        const hint = document.getElementById("reorderHint");
+        hint.style.visibility = filesArray.length !== 0 ? "visible" : "hidden";
+
+        filesArray.forEach((file, index) => {
+          const li = document.createElement("li");
+          li.textContent = file.name;
+          li.setAttribute("draggable", true);
+          li.dataset.index = index;
+
+          const removeBtn = document.createElement("button");
+          removeBtn.textContent = "✕";
+          removeBtn.className = "remove-btn";
+          removeBtn.onclick = () => {
+            filesArray.splice(index, 1);
+            updateFileList();
+
+            // Reset input if no files left (fixes re-adding same file issue)
+            if (filesArray.length === 0) {
+              fileInput.value = "";
+            }
+          };
+
+          li.appendChild(removeBtn);
+          fileList.appendChild(li);
+
+          li.addEventListener("dragstart", (e) => {
+            e.dataTransfer.setData("text/plain", index);
+            li.classList.add("dragging");
+          });
+
+          li.addEventListener("dragend", () => li.classList.remove("dragging"));
+          li.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            li.classList.add("drag-over");
+          });
+
+          li.addEventListener("dragleave", () =>
+            li.classList.remove("drag-over")
+          );
+          li.addEventListener("drop", (e) => {
+            e.preventDefault();
+            li.classList.remove("drag-over");
+            const fromIndex = parseInt(e.dataTransfer.getData("text/plain"));
+            const toIndex = parseInt(li.dataset.index);
+            if (fromIndex !== toIndex) {
+              const moved = filesArray.splice(fromIndex, 1)[0];
+              filesArray.splice(toIndex, 0, moved);
+              updateFileList();
+            }
+          });
+        });
+      }
+
+      form.addEventListener("submit", (e) => {
+        if (filesArray.length === 0) {
+          alert("Please select at least one file.");
+          e.preventDefault();
+          return;
+        }
+
+        const formData = new FormData();
+        filesArray.forEach((file) => formData.append("files", file));
+        const includeReview = form.querySelector(
+          "[name='include_review']"
+        ).checked;
+        if (includeReview) formData.append("include_review", "on");
+
+        statusMsg.innerHTML = `Merging files... <span class="spinner"></span>`;
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = "0.5";
+
+        fetch("/", {
+          method: "POST",
+          body: formData,
+        })
+          .then((res) => res.blob())
+          .then((blob) => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "merged.xlsx";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            statusMsg.innerHTML = "✅ Done!";
+          })
+          .catch(() => {
+            statusMsg.innerHTML = "❌ Failed to merge.";
+          })
+          .finally(() => {
+            submitBtn.disabled = false;
+            submitBtn.style.opacity = "1";
+          });
+
+        e.preventDefault();
+      });
+    </script>
+  </body>
+</html>
