@@ -21,6 +21,9 @@ Count the number of messages in a Teams Chat for a time intervall in months.
 # setup virtual env
 python3 -m venv .venv
 
+# use .venv
+source .venv/bin/activate
+
 # install requirements
 pip install -r requirements.txt
 ```
