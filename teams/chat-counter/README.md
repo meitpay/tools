@@ -49,5 +49,5 @@ END_MONTH=
 
 ```sh
 # run script
-python counter.py
+python count_messages.py
 ```
