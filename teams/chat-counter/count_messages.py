@@ -96,6 +96,7 @@ while url:
     attempt = 0
     data = resp.json()
     batch = 0
+    hit_lower_bound = False
 
     for m in data.get("value", []):
         dt = datetime.fromisoformat(m["createdDateTime"].replace("Z", "+00:00"))
@@ -103,13 +104,17 @@ while url:
             count += 1
             batch += 1
         elif dt < START:
-            url = None
+            hit_lower_bound = True
             break
     print(f"Page {page}: counted {batch} messages (running total: {count})")
 
-    url = data.get("@odata.nextLink")
-    if url:
-        print("Next page detected.")
+    if hit_lower_bound:
+        url = None
+        print("Reached lower bound; stopping pagination.")
+    else:
+        url = data.get("@odata.nextLink")
+        if url:
+            print("Next page detected.")
 
 message_count = f"Messages from {START.strftime('%B %d')} to {END.strftime('%B %d, %Y')}: {count}."
 print(message_count)
